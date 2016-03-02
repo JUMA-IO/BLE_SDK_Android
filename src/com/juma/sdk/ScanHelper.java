@@ -10,6 +10,8 @@ import javax.crypto.KeyGenerator;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
 
+import com.juma.sdk.iBeaconClass.iBeacon;
+
 import android.annotation.SuppressLint;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothAdapter.LeScanCallback;
@@ -153,18 +155,24 @@ public class ScanHelper {
 	private BluetoothAdapter.LeScanCallback leScanCallback = new LeScanCallback() {
 
 		@Override
-		public void onLeScan(BluetoothDevice device, int rssi, byte[] scanRecord) {
-			if(!getServiceUuids(scanRecord).contains(JUMA_SERVICE_UUID))
+		public void onLeScan(BluetoothDevice device, int rssi, byte[] scanRecord) {		
+			final iBeacon ibeacon = iBeaconClass.fromScanData(device,rssi,scanRecord); 
+			if(ibeacon == null){
+			if(!getServiceUuids(scanRecord).contains(JUMA_SERVICE_UUID)){
 				return;
+			}
 			
 			if(name == null || name.equals("") || name.equals(device.getName())){
-				callback.onDiscover(new JumaDevice(context, ScanHelper.this, device.getName(), UUID.fromString(IDEncrypt(device.getAddress(), context))), rssi);
+				callback.onDiscover(new JumaDevice(context, ScanHelper.this, device.getName(), UUID.fromString(IDEncrypt(device.getAddress(), context))), rssi,null);
+			}
+			}else{
+				callback.onDiscover(new JumaDevice(context, ScanHelper.this, "iBeacon", UUID.fromString(ibeacon.proximityUuid)), rssi,ibeacon);
 			}
 		}
 	};
 
 	public interface  ScanCallback{
-		public void onDiscover(JumaDevice device, int rssi);
+		public void onDiscover(JumaDevice device, int rssi,iBeacon ibeacon);
 		public void onScanStateChange(int newState);
 	}
 
