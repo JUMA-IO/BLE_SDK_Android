@@ -34,6 +34,7 @@ public class JumaDevice {
 	private Context context = null;
 	private JumaDeviceCallback callback = null;
 	private ScanHelper scanHelper = null;
+	private JumaDevice device;
 
 	private boolean isConnected = false;
 	private boolean isConnecting = false;
@@ -65,6 +66,7 @@ public class JumaDevice {
 	private static final int MESSAGE_MAX_LENGTH = 198;
 
 	private byte[] readyMessage = null;
+	private byte[] sendMessage = null;
 	private byte[] firmwareData = null;
 	private int index = 0;
 	private boolean isUpdating = false;
@@ -75,14 +77,22 @@ public class JumaDevice {
 	public static final int ERROR = 1;
 	public static final int STATE_CONNECTED = 0;
 	public static final int STATE_DISCONNECTED = 1;
+	
 
 	JumaDevice(Context context, ScanHelper scanHelper, String name, UUID uuid) {
 		this.name = name;
 		this.uuid = uuid;
 		this.context = context;
 		this.scanHelper = scanHelper;
+		this.device = this;
 	}
-
+	public JumaDevice() {
+		this.name = null;
+		this.uuid = null;
+		this.context = null;
+		this.scanHelper = null;
+		this.device = this;
+	}
 	/**
 	 * Get device name
 	 * @return device name
@@ -124,9 +134,9 @@ public class JumaDevice {
 
 		this.callback = callback;
 
-		if(isConnected){
+		if(isConnected && uuid != null){
 			if(callback != null)
-				callback.onConnectionStateChange(SUCCESS, STATE_CONNECTED);
+				callback.onConnectionStateChange(SUCCESS, STATE_CONNECTED,device);
 			return true;
 		}
 
@@ -216,11 +226,13 @@ public class JumaDevice {
 		}
 
 		readyMessage = addMessageHead(type, message);
+		sendMessage = message;
 
 		bluetoothGattCharacteristicCommand.setValue(readPacket(readyMessage));
 
 		if(!bluetoothGatt.writeCharacteristic(bluetoothGattCharacteristicCommand)){
 			readyMessage = null;
+			sendMessage = null;
 
 			return false;
 		}
@@ -330,7 +342,7 @@ public class JumaDevice {
 					if(isConnecting){
 						isConnecting = false;
 						if(callback != null)
-							callback.onConnectionStateChange(ERROR, STATE_CONNECTED);
+							callback.onConnectionStateChange(ERROR, STATE_CONNECTED,device);
 						return;
 					}
 
@@ -354,7 +366,7 @@ public class JumaDevice {
 							}
 
 							if(callback != null)
-								callback.onConnectionStateChange(SUCCESS, STATE_DISCONNECTED);
+								callback.onConnectionStateChange(SUCCESS, STATE_DISCONNECTED,device);
 						}
 					}).start();
 
@@ -366,14 +378,14 @@ public class JumaDevice {
 				if(callback != null)
 					if(isConnecting){
 						isConnecting = false;
-						callback.onConnectionStateChange(ERROR, STATE_CONNECTED);
+						callback.onConnectionStateChange(ERROR, STATE_CONNECTED,device);
 					}
 
 				if(isDisconnecting){
 					isDisconnecting = false;
-					callback.onConnectionStateChange(ERROR, STATE_DISCONNECTED);
+					callback.onConnectionStateChange(ERROR, STATE_DISCONNECTED,device);
 				}
-
+				
 				gatt.close();
 
 				clear();
@@ -418,7 +430,7 @@ public class JumaDevice {
 				isConnecting = false;
 
 				if(callback != null)
-					callback.onConnectionStateChange(ERROR, STATE_CONNECTED);
+					callback.onConnectionStateChange(ERROR, STATE_CONNECTED,device);
 
 				gatt.close();
 
@@ -445,14 +457,14 @@ public class JumaDevice {
 					isConnected = true;
 					bluetoothGatt = gatt;
 					if(callback != null)
-						callback.onConnectionStateChange(SUCCESS, STATE_CONNECTED);
+						callback.onConnectionStateChange(SUCCESS, STATE_CONNECTED,device);
 				}
 
 			}else if(status == 133){
 				isConnecting = false;
 
 				if(callback != null)
-					callback.onConnectionStateChange(ERROR, STATE_CONNECTED);
+					callback.onConnectionStateChange(ERROR, STATE_CONNECTED,device);
 
 				gatt.close();
 
@@ -472,7 +484,7 @@ public class JumaDevice {
 
 							if(!bluetoothGatt.writeCharacteristic(bluetoothGattCharacteristicBulkOut)){
 								if(callback != null)
-									callback.onSend(ERROR);
+									callback.onSend(ERROR,null);
 								return;
 							}
 
@@ -483,12 +495,12 @@ public class JumaDevice {
 
 					if(readyMessage == null && !isUpdating)
 						if(callback != null)
-							callback.onSend(SUCCESS);
+							callback.onSend(SUCCESS,sendMessage);
 				}
 			}else {
 				if(!isUpdating){
 					if(callback != null)
-						callback.onSend(ERROR);
+						callback.onSend(ERROR,null);
 				}else{
 					isUpdating = false;
 					if(callback != null){
@@ -596,7 +608,7 @@ public class JumaDevice {
 				if(callback != null)
 					callback.onRemoteRssi(ERROR, rssi);
 
-				callback.onConnectionStateChange(ERROR, STATE_CONNECTED);
+				callback.onConnectionStateChange(ERROR, STATE_CONNECTED,device);
 
 				gatt.close();
 
